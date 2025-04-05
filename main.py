@@ -2,8 +2,7 @@ import pandas as pd
 from web3 import Web3
 from function_bridge_usdc_to_arb import swap_max_usdc_fantom_to_arbitrum
 from function_bridge_usdc_to_opt import swap_usdc_fantom_to_optimism
-from buy_ftm_by_eth import swap_eth_base_to_fantom  # Обновили импорт
-from send_to_ex import send_to_exchange_wallet
+from buy_ftm_by_eth import swap_eth_base_to_fantom  # Импорт для перевода ETH в FTM
 
 def process_wallets(excel_file='wallets.xlsx'):
     # Чтение Excel-файла
@@ -23,7 +22,7 @@ def process_wallets(excel_file='wallets.xlsx'):
     # Обработка каждого кошелька
     for index, row in df.iterrows():
         private_key = str(row['PrivateKey']).strip()
-        amount_eth = float(row['Amount'])  # Теперь это сумма в ETH
+        amount_eth = float(row['Amount'])  # Сумма в ETH
         arb = int(row['Arb'])
         optimism = int(row['Optimism'])
         destination_address = str(row['Destination']).strip()
@@ -82,16 +81,6 @@ def process_wallets(excel_file='wallets.xlsx'):
         except Exception as e:
             print(f"❌ Ошибка при свапе в {network}: {str(e)}")
             continue
-
-        # Шаг 3: Отправка токенов на указанный адрес
-        try:
-            send_tx = send_to_exchange_wallet(private_key, network, destination_address)
-            if send_tx:
-                print(f"✅ Отправка в {network} на адрес {destination_address} выполнена: {send_tx.hex()}")
-            else:
-                print(f"❌ Ошибка при отправке в {network}")
-        except Exception as e:
-            print(f"❌ Ошибка при отправке в {network}: {str(e)}")
 
     print("\n=== Обработка всех кошельков завершена ===")
 
