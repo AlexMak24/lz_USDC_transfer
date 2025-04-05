@@ -1,16 +1,44 @@
 import pandas as pd
 from web3 import Web3
 from function_bridge_usdc_to_arb import swap_max_usdc_fantom_to_arbitrum
-from function_bridge_usdc_to_opt import swap_usdc_fantom_to_optimism
+from function_bridge_usdc_to_opt import swap_max_usdc_fantom_to_optimism
 from buy_ftm_by_eth import swap_eth_base_to_fantom  # Импорт для перевода ETH в FTM
+
+# Устанавливаем соединение с сетью
+web3 = Web3(Web3.HTTPProvider('https://fantom-rpc.publicnode.com'))  # URL вашего узла Ethereum или другой сети
+
+# Адрес контракта lzUsdc
+lz_usdc_address = '0x28a92dde19D9989F39A49905d7C9C2FAc7799bDf'
+
+# ABI контракта lzUsdc
+lz_usdc_abi = [
+    # Минимальный ABI для проверки баланса (например, с методами balanceOf)
+    {
+        "constant": True,
+        "inputs": [{"name": "account", "type": "address"}],
+        "name": "balanceOf",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "payable": False,
+        "stateMutability": "view",
+        "type": "function"
+    }
+]
+
+# Функция для проверки баланса lzUsdc
+def check_balance_lz_usdc(private_key):
+    # Получаем адрес кошелька из приватного ключа
+    account_address = web3.eth.account.from_key(private_key).address  # Исправлено на web3.eth.account.from_key
+    contract = web3.eth.contract(address=lz_usdc_address, abi=lz_usdc_abi)
+    balance = contract.functions.balanceOf(account_address).call()
+    return balance
 
 def process_wallets(excel_file='wallets.xlsx'):
     # Чтение Excel-файла
     try:
         df = pd.read_excel(excel_file)
-        print(f"✅ Успешно загружен файл {excel_file}")
+        print(f" Успешно загружен файл {excel_file}")
     except Exception as e:
-        print(f"❌ Ошибка при чтении файла {excel_file}: {str(e)}")
+        print(f" Ошибка при чтении файла {excel_file}: {str(e)}")
         return
 
     # Проверка структуры файла
@@ -34,6 +62,12 @@ def process_wallets(excel_file='wallets.xlsx'):
         # Проверка валидности приватного ключа
         if not (len(private_key) == 64 and all(c in '0123456789abcdef' for c in private_key)):
             print(f"❌ Неверный формат приватного ключа: должен быть 64-символьной шестнадцатеричной строкой")
+            continue
+
+        # Проверка баланса lzUsdc
+        balance = check_balance_lz_usdc(private_key)
+        if balance == 0:
+            print(f"❌ На кошельке {private_key[:6]}...{private_key[-6:]} нет lzUsdc (баланс 0), пропускаем его.")
             continue
 
         # Определение сети
@@ -62,7 +96,7 @@ def process_wallets(excel_file='wallets.xlsx'):
             if network == 'arb':
                 swap_tx = swap_max_usdc_fantom_to_arbitrum(private_key)
             elif network == 'opt':
-                swap_tx = swap_usdc_fantom_to_optimism(private_key)
+                swap_tx = swap_max_usdc_fantom_to_optimism(private_key)
 
             if swap_tx:
                 print(f"✅ Свап в {network} выполнен: {swap_tx.hex()}")
