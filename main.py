@@ -14,35 +14,26 @@ def process_wallets(excel_file='wallets.xlsx'):
         return
 
     # Проверка структуры файла
-    required_columns = ['PrivateKey', 'Amount', 'Arb', 'Optimism', 'Destination']
+    required_columns = ['PrivateKey', 'Amount', 'Arb', 'Optimism']
     if not all(col in df.columns for col in required_columns):
         print(f"❌ В файле {excel_file} отсутствуют необходимые столбцы: {required_columns}")
         return
 
     # Обработка каждого кошелька
     for index, row in df.iterrows():
-        private_key = str(row['PrivateKey']).strip()
+        private_key = str(row['PrivateKey']).strip().replace("0x", "")  # Убираем префикс 0x
         amount_eth = float(row['Amount'])  # Сумма в ETH
         arb = int(row['Arb'])
         optimism = int(row['Optimism'])
-        destination_address = str(row['Destination']).strip()
 
         print(f"\n=== Обработка кошелька {index + 1} ===")
         print(f"Приватный ключ: {private_key[:6]}...{private_key[-6:]}")
         print(f"Сумма ETH: {amount_eth}")
         print(f"Arb: {arb}, Optimism: {optimism}")
-        print(f"Адрес назначения: {destination_address}")
 
         # Проверка валидности приватного ключа
         if not (len(private_key) == 64 and all(c in '0123456789abcdef' for c in private_key)):
             print(f"❌ Неверный формат приватного ключа: должен быть 64-символьной шестнадцатеричной строкой")
-            continue
-
-        # Проверка валидности адреса назначения
-        try:
-            Web3.to_checksum_address(destination_address)
-        except ValueError:
-            print(f"❌ Неверный формат адреса назначения: {destination_address}")
             continue
 
         # Определение сети
