@@ -4,15 +4,16 @@ from function_bridge_usdc_to_arb import swap_max_usdc_fantom_to_arbitrum
 from function_bridge_usdc_to_opt import swap_max_usdc_fantom_to_optimism
 from buy_ftm_by_eth import swap_eth_base_to_fantom  # Импорт для перевода ETH в FTM
 
-# Устанавливаем соединение с сетью
-web3 = Web3(Web3.HTTPProvider('https://fantom-rpc.publicnode.com'))  # URL вашего узла Ethereum или другой сети
+# Устанавливаем соединение с сетью Fantom
+web3 = Web3(Web3.HTTPProvider('https://fantom-rpc.publicnode.com'))
+if not web3.is_connected():
+    raise Exception('❌ Не удалось подключиться к Fantom RPC')
 
-# Адрес контракта lzUsdc
+# Адрес контракта lzUSDC
 lz_usdc_address = '0x28a92dde19D9989F39A49905d7C9C2FAc7799bDf'
 
-# ABI контракта lzUsdc
+# ABI контракта lzUSDC
 lz_usdc_abi = [
-    # Минимальный ABI для проверки баланса (например, с методами balanceOf)
     {
         "constant": True,
         "inputs": [{"name": "account", "type": "address"}],
@@ -24,13 +25,19 @@ lz_usdc_abi = [
     }
 ]
 
-# Функция для проверки баланса lzUsdc
+# Функция для проверки баланса lzUSDC
 def check_balance_lz_usdc(private_key):
-    # Получаем адрес кошелька из приватного ключа
-    account_address = web3.eth.account.from_key(private_key).address  # Исправлено на web3.eth.account.from_key
+    account_address = web3.eth.account.from_key(private_key).address
     contract = web3.eth.contract(address=lz_usdc_address, abi=lz_usdc_abi)
     balance = contract.functions.balanceOf(account_address).call()
     return balance
+
+# Функция для проверки баланса FTM
+def check_balance_ftm(private_key):
+    account_address = web3.eth.account.from_key(private_key).address
+    balance_wei = web3.eth.get_balance(account_address)
+    balance_ftm = web3.from_wei(balance_wei, 'ether')  # Преобразуем wei в FTM
+    return balance_ftm
 
 def process_wallets(excel_file='wallets.xlsx'):
     # Чтение Excel-файла
@@ -64,11 +71,16 @@ def process_wallets(excel_file='wallets.xlsx'):
             print(f"❌ Неверный формат приватного ключа: должен быть 64-символьной шестнадцатеричной строкой")
             continue
 
-        # Проверка баланса lzUsdc
-        balance = check_balance_lz_usdc(private_key)
-        if balance == 0:
-            print(f"❌ На кошельке {private_key[:6]}...{private_key[-6:]} нет lzUsdc (баланс 0), пропускаем его.")
+        # Проверка баланса lzUSDC
+        balance_lz_usdc = check_balance_lz_usdc(private_key)
+        if balance_lz_usdc == 0:
+            print(f"❌ На кошельке {private_key[:6]}...{private_key[-6:]} нет lzUSDC (баланс 0), пропускаем его.")
             continue
+        print(f"💰 Баланс lzUSDC: {balance_lz_usdc / 10**6:.2f} USDC")
+
+        # Проверка баланса FTM
+        balance_ftm = check_balance_ftm(private_key)
+        print(f"💰 Баланс FTM: {balance_ftm:.6f} FTM")
 
         # Определение сети
         if arb == 1 and optimism == 0:
@@ -79,17 +91,21 @@ def process_wallets(excel_file='wallets.xlsx'):
             print(f"❌ Неверный выбор сети: Arb={arb}, Optimism={optimism}. Должно быть только одно значение 1")
             continue
 
-        # Шаг 1: Перевод ETH с Base на Fantom (получение FTM)
-        try:
-            buy_ftm_tx = swap_eth_base_to_fantom(private_key, amount_eth)  # Передаем amount_eth напрямую
-            if buy_ftm_tx:
-                print(f"✅ Перевод ETH с Base на Fantom выполнен: {buy_ftm_tx.hex()}")
-            else:
-                print(f"❌ Ошибка при переводе ETH с Base на Fantom")
+        # Шаг 1: Перевод ETH с Base на Fantom (получение FTM), если баланс FTM < 2
+        if balance_ftm < 2:
+            print(f"ℹ️ Баланс FTM меньше 2 ({balance_ftm:.6f} FTM), выполняем перевод ETH с Base на Fantom...")
+            try:
+                buy_ftm_tx = swap_eth_base_to_fantom(private_key, amount_eth)
+                if buy_ftm_tx:
+                    print(f"✅ Перевод ETH с Base на Fantom выполнен: {buy_ftm_tx.hex()}")
+                else:
+                    print(f"❌ Ошибка при переводе ETH с Base на Fantom")
+                    continue
+            except Exception as e:
+                print(f"❌ Ошибка при переводе ETH с Base на Fantom: {str(e)}")
                 continue
-        except Exception as e:
-            print(f"❌ Ошибка при переводе ETH с Base на Fantom: {str(e)}")
-            continue
+        else:
+            print(f"ℹ️ Баланс FTM достаточен ({balance_ftm:.6f} FTM >= 2 FTM), пропускаем перевод ETH")
 
         # Шаг 2: Свап в выбранную сеть (Arbitrum или Optimism)
         try:
