@@ -136,8 +136,8 @@ def swap_eth_base_to_fantom(private_key, amount_eth, rpc_url=BASE_RPC, from_toke
 if __name__ == "__main__":
     # Список приватных ключей
     private_keys = [
-        '90bc552fcb8c67d6942b2b383f3388c7cc1254d2590e1753f915f8dcc5f8c2e2',
-        '90bc552fcb8c67d6942b2b386f3388c7cc1254d2590e1753f915f8dcc5f8c2e2',
+        '',
+        '',
     ]
 
     amount_eth = 0.001  # Теперь вводим сумму в ETH (например, 0.001 ETH)
